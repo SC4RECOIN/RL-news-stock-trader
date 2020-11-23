@@ -6,6 +6,9 @@ from utils.ppg_model import PPG, Memory, device
 from torch.distributions import Categorical
 from collections import deque, namedtuple
 from tqdm import tqdm
+from utils.trader import Trader
+
+signals = ["BULLISH", "NEUTRAL", "BEARISH"]
 
 
 def main(
@@ -34,7 +37,7 @@ def main(
     monitor=False,
 ):
     state_dim = len(df["encoding"].iloc[0])
-    num_actions = 3  # BEAR, NEUT, BULL
+    num_actions = len(signals)
 
     memories = deque([])
     aux_memories = deque([])
@@ -67,6 +70,8 @@ def main(
     num_policy_updates = 0
 
     for eps in tqdm(range(num_episodes), desc="episodes"):
+        trader = Trader()
+
         for idx in range(len(df) - 1):
             time += 1
 
@@ -80,11 +85,13 @@ def main(
             action_log_prob = dist.log_prob(action)
             action = action.item()
 
-            reward = 0
-            done = False
+            trader.trade_on_signal(
+                df["symbol"].iloc[idx], signals[action], df["datetime"].iloc[idx]
+            )
+            reward = trader.reward()
             next_state = np.array(df["encoding"].iloc[idx + 1]).astype(np.float32)
 
-            memory = Memory(state, action, action_log_prob, reward, done, value)
+            memory = Memory(state, action, action_log_prob, reward, False, value)
             memories.append(memory)
 
             state = next_state
