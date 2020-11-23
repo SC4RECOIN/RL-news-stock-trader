@@ -34,7 +34,7 @@ if __name__ == "__main__":
 
         encodings = encode(text)
         for idx, encoding in enumerate(encodings):
-            news[idx]["encoding"] = encoding.tolist()
+            news[idx]["encoding"] = [round(x, 10) for x in encoding.tolist()]
 
         with open(f"{news_dir}/{filename}", "w") as f:
-            json.dump(news, f, indent=4)
+            json.dump(news, f)
