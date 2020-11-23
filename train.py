@@ -1,7 +1,7 @@
-# from utils.encoder import encode
 import numpy as np
+import pandas as pd
 import torch
-import gym
+import os
 from utils.ppg_model import PPG, Memory, device
 from torch.distributions import Categorical
 from collections import deque, namedtuple
@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 
 def main(
-    env_name="LunarLander-v2",
+    df,
     num_episodes=50000,
     max_timesteps=500,
     actor_hidden_dim=32,
@@ -33,13 +33,8 @@ def main(
     load=False,
     monitor=False,
 ):
-    env = gym.make(env_name)
-
-    if monitor:
-        env = gym.wrappers.Monitor(env, "./tmp/", force=True)
-
-    state_dim = env.observation_space.shape[0]
-    num_actions = env.action_space.n
+    state_dim = len(df["encoding"].iloc[0])
+    num_actions = 3  # BEAR, NEUT, BULL
 
     memories = deque([])
     aux_memories = deque([])
@@ -69,18 +64,13 @@ def main(
         np.random.seed(seed)
 
     time = 0
-    updated = False
     num_policy_updates = 0
 
     for eps in tqdm(range(num_episodes), desc="episodes"):
-        render_eps = render and eps % render_every_eps == 0
-        state = env.reset()
-        for timestep in range(max_timesteps):
+        for idx in range(len(df) - 1):
             time += 1
 
-            if updated and render_eps:
-                env.render()
-
+            state = np.array(df["encoding"].iloc[idx]).astype(np.float32)
             state = torch.from_numpy(state).to(device)
             action_probs, _ = agent.actor(state)
             value = agent.critic(state)
@@ -90,7 +80,9 @@ def main(
             action_log_prob = dist.log_prob(action)
             action = action.item()
 
-            next_state, reward, done, _ = env.step(action)
+            reward = 0
+            done = False
+            next_state = np.array(df["encoding"].iloc[idx + 1]).astype(np.float32)
 
             memory = Memory(state, action, action_log_prob, reward, done, value)
             memories.append(memory)
@@ -106,19 +98,13 @@ def main(
                     agent.learn_aux(aux_memories)
                     aux_memories.clear()
 
-                updated = True
-
-            if done:
-                if render_eps:
-                    updated = False
-                break
-
-        if render_eps:
-            env.close()
-
         if eps % save_every == 0:
             agent.save()
 
 
 if __name__ == "__main__":
-    main()
+    data_dir = "hist_news"
+    df = pd.concat(
+        [pd.read_json(f"{data_dir}/{filename}") for filename in os.listdir(data_dir)]
+    )
+    main(df)
