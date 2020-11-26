@@ -65,9 +65,6 @@ class QuoteDB(object):
 
             to_fetch.append(symbol)
 
-        print(quotes)
-        print(target_date.replace("T", " "))
-
         if len(to_fetch) > 0:
             values = self._get_prices(to_fetch, timestamp)
             self._insert_quotes(values)
