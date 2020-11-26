@@ -1,9 +1,5 @@
-import alpaca_trade_api as tradeapi
-from typing import List
-from dataclasses import dataclass
-from typing import Tuple
 import os
-import arrow
+from utils.quotes import QuoteDB
 
 
 if "APCA_API_KEY_ID" not in os.environ:
@@ -15,9 +11,12 @@ if "APCA_API_SECRET_KEY" not in os.environ:
 if "BASE_URL" not in os.environ:
     raise Exception("Please add `BASE_URL` to your env vars for Alpaca")
 
+os.environ["APCA_RETRY_MAX"] = 30
+
 
 class Trader(object):
     def __init__(self, hold_period=7, max_hold=10, starting_balance=30000):
+        self.quotes = QuoteDB()
         self.starting_balance = starting_balance
         self.balance = starting_balance
         self.positions = {}
@@ -42,7 +41,7 @@ class Trader(object):
 
     def rebalance(self, symbol: str, timestamp: int, remove=False):
         positions = self.positions.keys()
-        quotes = get_prices(positions, timestamp)
+        quotes = self.quotes.get_quotes(positions, timestamp)
 
         # sell all positions
         for symbol, qty in self.positions.items():
@@ -67,18 +66,3 @@ class Trader(object):
         Calculates current value of positions over intial capital.
         """
         return 0
-
-    @staticmethod
-    def get_prices(symbols: List[str], timestamp: int):
-        alpaca = tradeapi.REST()
-        bars = 10
-
-        # set window
-        start = arrow.get(timestamp)
-        end = start.shift(minutes=bars)
-
-        quotes = alpaca.get_barset(
-            symbols, "1Min", limit=bars, start=start.isoformat(), end=end.isoformat()
-        )
-
-        return {symbol: quotes[symbol][0].c for symbol in symbols}
