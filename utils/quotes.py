@@ -83,6 +83,3 @@ class QuoteDB(object):
         end = arrow.get(timestamp).shift(minutes=5)
 
         return alpaca.get_barset(symbols, "1Min", limit=bars, end=end.isoformat())
-
-
-print(QuoteDB().get_quotes(["SPY"], 1586369464))
