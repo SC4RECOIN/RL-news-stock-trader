@@ -45,13 +45,15 @@ class QuoteDB(object):
     def get_quotes(self, symbols: List[str], timestamp: int):
         quotes = {}
         to_fetch = []
-        target_date = arrow.get(timestamp).isoformat()
+
+        # shift 4 hours (UTC -> EST)
+        target_date = arrow.get(timestamp).shift(hours=-4).format("YYYY-MM-DD HH:mm:ss")
 
         # check for quotes in db
         for symbol in symbols:
             query = f"""
                 SELECT close FROM quotes
-                WHERE ts <= '{target_date}' AND symbol = '{symbol}'
+                WHERE ts >= '{target_date}' AND symbol = '{symbol}'
                 ORDER BY ts
                 LIMIT 1;
                 """
@@ -62,6 +64,9 @@ class QuoteDB(object):
                 continue
 
             to_fetch.append(symbol)
+
+        print(quotes)
+        print(target_date.replace("T", " "))
 
         if len(to_fetch) > 0:
             values = self._get_prices(to_fetch, timestamp)
