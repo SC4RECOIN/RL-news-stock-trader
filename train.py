@@ -88,7 +88,7 @@ def main(
             trader.trade_on_signal(
                 df["symbol"].iloc[idx], signals[action], df["datetime"].iloc[idx]
             )
-            reward = trader.reward()
+            reward = trader.reward(df["datetime"].iloc[idx])
             next_state = np.array(df["encoding"].iloc[idx + 1]).astype(np.float32)
 
             memory = Memory(state, action, action_log_prob, reward, False, value)
@@ -110,8 +110,11 @@ def main(
 
 
 if __name__ == "__main__":
-    data_dir = "hist_news"
+    data_dir = "pickle_news"
     df = pd.concat(
-        [pd.read_json(f"{data_dir}/{filename}") for filename in os.listdir(data_dir)]
+        [pd.read_pickle(f"{data_dir}/{filename}") for filename in os.listdir(data_dir)]
     )
+    df = df.sort_values(by=["datetime"])
+    df = df.reset_index(drop=True)
+
     main(df)

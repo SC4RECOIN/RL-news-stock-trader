@@ -11,7 +11,7 @@ if "APCA_API_SECRET_KEY" not in os.environ:
 if "BASE_URL" not in os.environ:
     raise Exception("Please add `BASE_URL` to your env vars for Alpaca")
 
-os.environ["APCA_RETRY_MAX"] = 30
+os.environ["APCA_RETRY_MAX"] = "30"
 
 
 class Trader(object):
@@ -33,14 +33,18 @@ class Trader(object):
         Currently does not short on bearish signals.
         Can only hold `self.max_hold` positions.
         """
-        if signal == "BULLISH" and len(self.positions.keys()) < self.max_hold:
+        if (
+            signal == "BULLISH"
+            and len(self.positions.keys()) < self.max_hold
+            and symbol not in self.positions
+        ):
             self.rebalance(symbol, timestamp)
 
         elif signal == "BEARISH" and symbol in self.positions:
             self.rebalance(symbol, timestamp, True)
 
     def rebalance(self, symbol: str, timestamp: int, remove=False):
-        positions = self.positions.keys()
+        positions = list(self.positions.keys())
         quotes = self.quotes.get_quotes(positions, timestamp)
 
         # sell all positions
@@ -52,9 +56,16 @@ class Trader(object):
         else:
             positions.append(symbol)
 
+            # get quote for new pos
+            quote = self.quotes.get_quotes([symbol], timestamp)
+            quotes[symbol] = quote[symbol]
+
+        self.positions = {}
+        if len(positions) == 0:
+            return
+
         # re-enter positions
-        self.positions = []
-        target_val = len(self.positions.keys()) / self.balance
+        target_val = self.balance / len(positions)
         for symbol in positions:
             qty = target_val // quotes[symbol]
             self.balance -= qty * quotes[symbol]
@@ -65,4 +76,11 @@ class Trader(object):
         Reward is the current ROI.
         Calculates current value of positions over intial capital.
         """
-        return 0
+        positions = self.positions.keys()
+        quotes = self.quotes.get_quotes(positions, timestamp)
+        value = (
+            sum([quotes[symbol] * qty for symbol, qty in self.positions.items()])
+            + self.balance
+        )
+
+        return (value / self.starting_balance - 1) * 100

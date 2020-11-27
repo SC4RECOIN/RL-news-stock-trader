@@ -49,7 +49,7 @@ class QuoteDB(object):
         # shift 4 hours (UTC -> EST)
         target_date = arrow.get(timestamp).shift(hours=-4).format("YYYY-MM-DD HH:mm:ss")
 
-        # check for quotes in db
+        # check for quotes in db NEED TO LIST RANGE OF ts
         for symbol in symbols:
             query = f"""
                 SELECT close FROM quotes
