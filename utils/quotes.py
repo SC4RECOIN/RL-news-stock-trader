@@ -48,12 +48,16 @@ class QuoteDB(object):
 
         # shift 4 hours (UTC -> EST)
         target_date = arrow.get(timestamp).shift(hours=-4).format("YYYY-MM-DD HH:mm:ss")
+        max_date = (
+            arrow.get(timestamp).shift(minutes=-220).format("YYYY-MM-DD HH:mm:ss")
+        )
 
         # check for quotes in db NEED TO LIST RANGE OF ts
         for symbol in symbols:
             query = f"""
                 SELECT close FROM quotes
-                WHERE ts >= '{target_date}' AND symbol = '{symbol}'
+                WHERE ts >= '{target_date}' AND ts < '{max_date}'
+                AND symbol = '{symbol}'
                 ORDER BY ts
                 LIMIT 1;
                 """
