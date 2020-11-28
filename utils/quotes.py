@@ -2,6 +2,8 @@ import sqlite3
 import alpaca_trade_api as tradeapi
 import arrow
 from typing import List
+import pandas as pd
+import time
 
 
 class QuoteDB(object):
@@ -49,7 +51,10 @@ class QuoteDB(object):
         # shift 4 hours (UTC -> EST)
         target_date = arrow.get(timestamp).shift(hours=-4).format("YYYY-MM-DD HH:mm:ss")
         max_date = (
-            arrow.get(timestamp).shift(minutes=-220).format("YYYY-MM-DD HH:mm:ss")
+            # 3hrs 50min
+            arrow.get(timestamp)
+            .shift(minutes=-220)
+            .format("YYYY-MM-DD HH:mm:ss")
         )
 
         # check for quotes in db NEED TO LIST RANGE OF ts
@@ -84,3 +89,55 @@ class QuoteDB(object):
         end = arrow.get(timestamp).shift(minutes=5)
 
         return alpaca.get_barset(symbols, "1Min", limit=bars, end=end.isoformat())
+
+
+def prefetch_quotes(symbols, timeframe="5Min", start="2019-01-01"):
+    """
+    Fetch quotes for all ticker so that the QuoteDB is fully loaded.
+    If quotes are missing then they will be fetched so running this isnt
+    necessary, however, it will speed up training significantly
+    """
+    storage = QuoteDB()
+    alpaca = tradeapi.REST()
+    stop = arrow.get(start)
+    end = arrow.get()
+
+    df = pd.DataFrame([])
+    while end > stop:
+        all_quotes = alpaca.get_barset(
+            symbols, timeframe, limit=1000, end=end.isoformat()
+        )
+        storage._insert_quotes(all_quotes)
+
+        for symbol in symbols:
+            quotes = [
+                {
+                    "High": q.h,
+                    "Low": q.l,
+                    "Close": q.c,
+                    "Open": q.o,
+                    "Time": q.t,
+                    "Symbol": symbol,
+                }
+                for q in all_quotes[symbol]
+            ]
+            df = pd.concat([df, pd.DataFrame(quotes)])
+
+            if len(quotes) > 0:
+                end = arrow.get(quotes[0]["Time"])
+
+        # abide by ratelimit
+        print(f"{end.format('YYYY-MM-DD')}\tlen: {len(df)}")
+        time.sleep(0.4)
+
+    df = df.sort_values(by="Time")
+    df = df.drop_duplicates()
+    df = df.reset_index(drop=True)
+
+    df.to_pickle("quotes.pkl")
+
+
+if __name__ == "__main__":
+    stocks_df = pd.read_csv("../nas100.csv")
+    universe = stocks_df["Symbol"].values
+    prefetch_quotes(universe)
