@@ -72,7 +72,7 @@ def main(
     for eps in tqdm(range(num_episodes), desc="episodes"):
         trader = Trader()
 
-        for idx in range(len(df) - 1):
+        for idx in tqdm(range(len(df) - 1), total=len(df) - 1):
             time += 1
 
             state = np.array(df["encoding"].iloc[idx]).astype(np.float32)
@@ -104,6 +104,8 @@ def main(
                 if num_policy_updates % num_policy_updates_per_aux == 0:
                     agent.learn_aux(aux_memories)
                     aux_memories.clear()
+
+        print(f"reward after episode: {reward}")
 
         if eps % save_every == 0:
             agent.save()

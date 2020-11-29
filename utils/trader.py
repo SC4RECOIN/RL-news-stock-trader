@@ -11,7 +11,7 @@ if "APCA_API_SECRET_KEY" not in os.environ:
 if "BASE_URL" not in os.environ:
     raise Exception("Please add `BASE_URL` to your env vars for Alpaca")
 
-os.environ["APCA_RETRY_MAX"] = "30"
+os.environ["APCA_RETRY_WAIT"] = "30"
 
 
 class Trader(object):

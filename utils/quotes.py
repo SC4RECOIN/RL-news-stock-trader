@@ -51,9 +51,9 @@ class QuoteDB(object):
         # shift 4 hours (UTC -> EST)
         target_date = arrow.get(timestamp).shift(hours=-4).format("YYYY-MM-DD HH:mm:ss")
         max_date = (
-            # 3hrs 50min
+            # 3hrs 40min
             arrow.get(timestamp)
-            .shift(minutes=-220)
+            .shift(minutes=-210)
             .format("YYYY-MM-DD HH:mm:ss")
         )
 
