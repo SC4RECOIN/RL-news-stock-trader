@@ -1,9 +1,18 @@
 import sqlite3
 import alpaca_trade_api as tradeapi
+from utils.split_helper import split_adjust_multiplier as split_mult
 import arrow
 from typing import List
 import pandas as pd
+import os
 import time
+
+
+for env_var in ["APCA_API_KEY_ID", "APCA_API_SECRET_KEY", "BASE_URL", "IEX_TOKEN"]:
+    if env_var not in os.environ:
+        raise Exception(f"Please add `{env_var}` to your env vars")
+
+os.environ["APCA_RETRY_WAIT"] = "30"
 
 
 class QuoteDB(object):
@@ -79,6 +88,11 @@ class QuoteDB(object):
             self._insert_quotes(values)
             for symbol in to_fetch:
                 quotes[symbol] = values[symbol][0].c
+
+        # data needs to be split adjusted
+        for symbol, price in quotes.items():
+            mult = split_mult(symbol, arrow.get(timestamp))
+            quotes[symbol] = mult * price
 
         return quotes
 

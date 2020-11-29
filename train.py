@@ -7,6 +7,7 @@ from torch.distributions import Categorical
 from collections import deque, namedtuple
 from tqdm import tqdm
 from utils.trader import Trader
+import arrow
 
 signals = ["BULLISH", "NEUTRAL", "BEARISH"]
 
@@ -69,10 +70,11 @@ def main(
     time = 0
     num_policy_updates = 0
 
-    for eps in tqdm(range(num_episodes), desc="episodes"):
+    # for eps in tqdm(range(num_episodes), desc="episodes"):
+    for eps in range(num_episodes):
         trader = Trader()
 
-        for idx in tqdm(range(len(df) - 1), total=len(df) - 1):
+        for idx in range(len(df) - 1):
             time += 1
 
             state = np.array(df["encoding"].iloc[idx]).astype(np.float32)
@@ -89,6 +91,12 @@ def main(
                 df["symbol"].iloc[idx], signals[action], df["datetime"].iloc[idx]
             )
             reward = trader.reward(df["datetime"].iloc[idx])
+
+            #####
+            d = arrow.get(df["datetime"].iloc[idx]).format("YYYY-MM-DD")
+            print(f"\r{idx}\treward: {reward:.2f}\t\t{d}", end="")
+            #####
+
             next_state = np.array(df["encoding"].iloc[idx + 1]).astype(np.float32)
 
             memory = Memory(state, action, action_log_prob, reward, False, value)

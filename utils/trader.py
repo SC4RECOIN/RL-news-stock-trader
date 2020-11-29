@@ -2,18 +2,6 @@ import os
 from utils.quotes import QuoteDB
 
 
-if "APCA_API_KEY_ID" not in os.environ:
-    raise Exception("Please add `APCA_API_KEY_ID` to your env vars")
-
-if "APCA_API_SECRET_KEY" not in os.environ:
-    raise Exception("Please add `APCA_API_SECRET_KEY` to your env vars")
-
-if "BASE_URL" not in os.environ:
-    raise Exception("Please add `BASE_URL` to your env vars for Alpaca")
-
-os.environ["APCA_RETRY_WAIT"] = "30"
-
-
 class Trader(object):
     def __init__(self, hold_period=7, max_hold=10, starting_balance=30000):
         self.quotes = QuoteDB()

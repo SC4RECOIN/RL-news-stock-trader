@@ -1,0 +1,20 @@
+[
+    {
+        "exDate": "2020-08-31",
+        "declaredDate": "2020-08-24",
+        "ratio": 0.25,
+        "toFactor": 4,
+        "fromFactor": 1,
+        "description": "4-for-1 split",
+        "date": "2020-11-29"
+    },
+    {
+        "exDate": "2020-08-31",
+        "declaredDate": "2020-08-24",
+        "ratio": 0.25,
+        "toFactor": 4,
+        "fromFactor": 1,
+        "description": "4-for-1 split",
+        "date": "2020-11-29"
+    }
+]
