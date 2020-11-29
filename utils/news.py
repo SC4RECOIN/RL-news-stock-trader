@@ -7,6 +7,7 @@ import pandas as pd
 from datetime import datetime
 from typing import List
 from tqdm import tqdm
+import time
 
 if "IEX_TOKEN" not in os.environ:
     raise Exception("Please add `IEX_TOKEN` to your env vars")
@@ -38,6 +39,7 @@ def get_hist_news(symbol: str) -> List[NewsItem]:
         try:
             # fetch news for specific date
             r = requests.get(f"{url}&on={date_str}")
+            print(f"fetching {symbol} on {date_str}")
 
             news_items.extend(
                 [
@@ -55,6 +57,8 @@ def get_hist_news(symbol: str) -> List[NewsItem]:
                 ]
             )
 
+            time.sleep(0.02)
+
         except Exception as e:
             print(f"error getting news for {symbol} on {date_str}\n{e}\n{r.json()}")
 
@@ -67,6 +71,10 @@ def fetch_hist_list(symbols: List[str]) -> pd.DataFrame:
         os.makedirs(news_dir)
 
     for symbol in tqdm(symbols, total=len(symbols)):
+        # fetch already
+        if os.path.exists(f"{news_dir}/{symbol}.json"):
+            continue
+
         news = get_hist_news(symbol)
         news = pd.DataFrame(news)
 
@@ -78,4 +86,6 @@ def fetch_hist_list(symbols: List[str]) -> pd.DataFrame:
 
 
 if __name__ == "__main__":
-    fetch_hist_list(["AAPL"])
+    stocks_df = pd.read_csv("../nas100.csv")
+    universe = stocks_df["Symbol"].values
+    fetch_hist_list(universe)

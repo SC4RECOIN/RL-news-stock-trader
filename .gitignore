@@ -3,3 +3,6 @@ __pycache__
 *.pt
 hist_news
 .DS_Store
+pickle_news
+*.db
+*.pkl

@@ -1,15 +1,19 @@
-# from utils.encoder import encode
 import numpy as np
+import pandas as pd
 import torch
-import gym
+import os
 from utils.ppg_model import PPG, Memory, device
 from torch.distributions import Categorical
 from collections import deque, namedtuple
 from tqdm import tqdm
+from utils.trader import Trader
+import arrow
+
+signals = ["BULLISH", "NEUTRAL", "BEARISH"]
 
 
 def main(
-    env_name="LunarLander-v2",
+    df,
     num_episodes=50000,
     max_timesteps=500,
     actor_hidden_dim=32,
@@ -33,13 +37,8 @@ def main(
     load=False,
     monitor=False,
 ):
-    env = gym.make(env_name)
-
-    if monitor:
-        env = gym.wrappers.Monitor(env, "./tmp/", force=True)
-
-    state_dim = env.observation_space.shape[0]
-    num_actions = env.action_space.n
+    state_dim = len(df["encoding"].iloc[0])
+    num_actions = len(signals)
 
     memories = deque([])
     aux_memories = deque([])
@@ -69,18 +68,16 @@ def main(
         np.random.seed(seed)
 
     time = 0
-    updated = False
     num_policy_updates = 0
 
-    for eps in tqdm(range(num_episodes), desc="episodes"):
-        render_eps = render and eps % render_every_eps == 0
-        state = env.reset()
-        for timestep in range(max_timesteps):
+    # for eps in tqdm(range(num_episodes), desc="episodes"):
+    for eps in range(num_episodes):
+        trader = Trader()
+
+        for idx in range(len(df) - 1):
             time += 1
 
-            if updated and render_eps:
-                env.render()
-
+            state = np.array(df["encoding"].iloc[idx]).astype(np.float32)
             state = torch.from_numpy(state).to(device)
             action_probs, _ = agent.actor(state)
             value = agent.critic(state)
@@ -90,9 +87,19 @@ def main(
             action_log_prob = dist.log_prob(action)
             action = action.item()
 
-            next_state, reward, done, _ = env.step(action)
+            trader.trade_on_signal(
+                df["symbol"].iloc[idx], signals[action], df["datetime"].iloc[idx]
+            )
+            reward = trader.reward(df["datetime"].iloc[idx])
 
-            memory = Memory(state, action, action_log_prob, reward, done, value)
+            #####
+            d = arrow.get(df["datetime"].iloc[idx]).format("YYYY-MM-DD")
+            print(f"\r{idx}\treward: {reward:.2f}\t\t{d}", end="")
+            #####
+
+            next_state = np.array(df["encoding"].iloc[idx + 1]).astype(np.float32)
+
+            memory = Memory(state, action, action_log_prob, reward, False, value)
             memories.append(memory)
 
             state = next_state
@@ -106,19 +113,18 @@ def main(
                     agent.learn_aux(aux_memories)
                     aux_memories.clear()
 
-                updated = True
-
-            if done:
-                if render_eps:
-                    updated = False
-                break
-
-        if render_eps:
-            env.close()
+        print(f"reward after episode: {reward}")
 
         if eps % save_every == 0:
             agent.save()
 
 
 if __name__ == "__main__":
-    main()
+    data_dir = "pickle_news"
+    df = pd.concat(
+        [pd.read_pickle(f"{data_dir}/{filename}") for filename in os.listdir(data_dir)]
+    )
+    df = df.sort_values(by=["datetime"])
+    df = df.reset_index(drop=True)
+
+    main(df)

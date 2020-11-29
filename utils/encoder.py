@@ -21,7 +21,13 @@ def encode(sentences: List[str]) -> np.ndarray:
 
 if __name__ == "__main__":
     news_dir = "../hist_news"
+    pickle_dir = "../pickle_news"
+
+    if not os.path.exists(pickle_dir):
+        os.makedirs(pickle_dir)
+
     for filename in os.listdir(news_dir):
+        # load JSON data
         with open(f"{news_dir}/{filename}") as f:
             news = json.load(f)
 
@@ -36,5 +42,5 @@ if __name__ == "__main__":
         for idx, encoding in enumerate(encodings):
             news[idx]["encoding"] = [round(x, 10) for x in encoding.tolist()]
 
-        with open(f"{news_dir}/{filename}", "w") as f:
-            json.dump(news, f)
+        # save binary as file gets too big for JSON
+        pd.DataFrame(news).to_pickle(f"{pickle_dir}/{filename.split('.')[0]}.pkl")
