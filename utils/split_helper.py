@@ -33,5 +33,5 @@ def split_adjust_multiplier(symbol: str, date: arrow.Arrow):
             return 1
 
     splits = set([(arrow.get(s["exDate"]), s["toFactor"]) for s in splits])
-    splits = filter(lambda s: s[0] > date, splits)
+    splits = filter(lambda s: s[0] >= date, splits)
     return 1 / math.prod([s[1] for s in splits])
