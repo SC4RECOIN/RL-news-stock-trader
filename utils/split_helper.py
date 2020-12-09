@@ -2,7 +2,7 @@ from iexfinance.stocks import Stock
 import arrow
 import os
 import json
-import math
+import numpy as np
 
 if not os.path.exists("cache"):
     os.makedirs("cache")
@@ -34,4 +34,4 @@ def split_adjust_multiplier(symbol: str, date: arrow.Arrow):
 
     splits = set([(arrow.get(s["exDate"]), s["toFactor"]) for s in splits])
     splits = filter(lambda s: s[0] >= date, splits)
-    return 1 / math.prod([s[1] for s in splits])
+    return 1 / np.prod([s[1] for s in splits])

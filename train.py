@@ -94,7 +94,7 @@ def main(
 
             #####
             d = arrow.get(df["datetime"].iloc[idx]).format("YYYY-MM-DD")
-            print(f"\r{idx}\treward: {reward:.2f}\t\t{d}", end="")
+            print(f"\r{idx}\treward: {reward:8.2f}\t\t{d}", end="")
             #####
 
             next_state = np.array(df["encoding"].iloc[idx + 1]).astype(np.float32)

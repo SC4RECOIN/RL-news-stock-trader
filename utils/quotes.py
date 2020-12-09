@@ -8,7 +8,7 @@ import os
 import time
 
 
-for env_var in ["APCA_API_KEY_ID", "APCA_API_SECRET_KEY", "BASE_URL", "IEX_TOKEN"]:
+for env_var in ["APCA_API_KEY_ID", "APCA_API_SECRET_KEY", "APCA_API_BASE_URL", "IEX_TOKEN"]:
     if env_var not in os.environ:
         raise Exception(f"Please add `{env_var}` to your env vars")
 
@@ -17,6 +17,7 @@ os.environ["APCA_RETRY_WAIT"] = "30"
 
 class QuoteDB(object):
     def __init__(self):
+        self.mem_cache = {}
         self.con = sqlite3.connect("quotes.db")
         self.con.execute(
             """
@@ -68,6 +69,10 @@ class QuoteDB(object):
 
         # check for quotes in db NEED TO LIST RANGE OF ts
         for symbol in symbols:
+            if f"{symbol}{timestamp}" in self.mem_cache:
+                quotes[symbol] = self.mem_cache[f"{symbol}{timestamp}"]
+                continue
+
             query = f"""
                 SELECT close FROM quotes
                 WHERE ts >= '{target_date}' AND ts < '{max_date}'
@@ -79,6 +84,7 @@ class QuoteDB(object):
 
             if len(results) > 0:
                 quotes[symbol] = results[0][0]
+                self.mem_cache[f"{symbol}{timestamp}"] = quotes[symbol]
                 continue
 
             to_fetch.append(symbol)
@@ -93,6 +99,7 @@ class QuoteDB(object):
         for symbol, price in quotes.items():
             mult = split_mult(symbol, arrow.get(timestamp))
             quotes[symbol] = mult * price
+            self.mem_cache[f"{symbol}{timestamp}"] = quotes[symbol]
 
         return quotes
 

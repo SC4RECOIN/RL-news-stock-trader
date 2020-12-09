@@ -6,3 +6,4 @@ hist_news
 pickle_news
 *.db
 *.pkl
+cache
