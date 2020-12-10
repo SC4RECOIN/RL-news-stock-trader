@@ -1,164 +1,89 @@
-import sqlite3
-import alpaca_trade_api as tradeapi
-from utils.split_helper import split_adjust_multiplier as split_mult
+from polygon import RESTClient
+from datetime import datetime
+import pickle 
 import arrow
-from typing import List
-import pandas as pd
 import os
-import time
+import json
 
-
-for env_var in ["APCA_API_KEY_ID", "APCA_API_SECRET_KEY", "APCA_API_BASE_URL", "IEX_TOKEN"]:
-    if env_var not in os.environ:
-        raise Exception(f"Please add `{env_var}` to your env vars")
-
-os.environ["APCA_RETRY_WAIT"] = "30"
-
-
-class QuoteDB(object):
+class Quotes(object):
     def __init__(self):
-        self.mem_cache = {}
-        self.con = sqlite3.connect("quotes.db")
-        self.con.execute(
-            """
-            CREATE TABLE IF NOT EXISTS quotes
-            (
-                id          TEXT    PRIMARY KEY     NOT NULL,
-                symbol      TEXT                    NOT NULL,
-                ts          DATE                    NOT NULL,
-                open        REAL                            ,
-                high        REAL                            ,
-                low         REAL                            ,
-                close       REAL                    NOT NULL,
-                volume      REAL
-            );
-            """
-        )
+        if not os.path.exists('price_cache/cache.json'):
+            raise ValueError('Missing price cache')
 
-    def _insert_quotes(self, quotes):
-        values = []
-        for symbol, quotes in quotes.items():
-            values.extend(
-                [
-                    f"('{symbol}{q.t}', '{symbol}', '{q.t}', {q.o}, {q.h}, {q.l}, {q.c}, {q.v})"
-                    for q in quotes
-                ]
-            )
+        with open('price_cache/cache.json') as f:
+            self.cache = json.load(f)
 
-        self.con.execute(
-            f"""
-            INSERT OR IGNORE
-            INTO quotes (id, symbol, ts, open, high, low, close, volume)
-            VALUES {', '.join(values)}
-            """
-        )
-        self.con.commit()
+        if 'POLYGON_KEY' not in os.environ:
+            raise ValueError('Missing POLYGON_KEY key in env vars')
 
-    def get_quotes(self, symbols: List[str], timestamp: int):
-        quotes = {}
-        to_fetch = []
+        self.key = os.environ['POLYGON_KEY']
 
-        # shift 4 hours (UTC -> EST)
-        target_date = arrow.get(timestamp).shift(hours=-4).format("YYYY-MM-DD HH:mm:ss")
-        max_date = (
-            # 3hrs 40min
-            arrow.get(timestamp)
-            .shift(minutes=-210)
-            .format("YYYY-MM-DD HH:mm:ss")
-        )
+    def get_quote(self, symbol, timestamp):
+        return self.cache[f"{symbol}{timestamp}"]
 
-        # check for quotes in db NEED TO LIST RANGE OF ts
-        for symbol in symbols:
-            if f"{symbol}{timestamp}" in self.mem_cache:
-                quotes[symbol] = self.mem_cache[f"{symbol}{timestamp}"]
-                continue
+    def __getitem__(self, key):
+        return self.cache[key]
 
-            query = f"""
-                SELECT close FROM quotes
-                WHERE ts >= '{target_date}' AND ts < '{max_date}'
-                AND symbol = '{symbol}'
-                ORDER BY ts
-                LIMIT 1;
-                """
-            results = [row for row in self.con.execute(query)]
+    def _save_cache(self):
+        if not os.path.exists('price_cache'):
+            os.mkdir('price_cache')
 
-            if len(results) > 0:
-                quotes[symbol] = results[0][0]
-                self.mem_cache[f"{symbol}{timestamp}"] = quotes[symbol]
-                continue
+        with open('price_cache/cache.pkl', 'wb') as f:
+            pickle.dump(self.cache, f)
 
-            to_fetch.append(symbol)
-
-        if len(to_fetch) > 0:
-            values = self._get_prices(to_fetch, timestamp)
-            self._insert_quotes(values)
-            for symbol in to_fetch:
-                quotes[symbol] = values[symbol][0].c
-
-        # data needs to be split adjusted
-        for symbol, price in quotes.items():
-            mult = split_mult(symbol, arrow.get(timestamp))
-            quotes[symbol] = mult * price
-            self.mem_cache[f"{symbol}{timestamp}"] = quotes[symbol]
-
-        return quotes
+        with open('price_cache/cache.json', 'w') as f:
+            json.dump(self.cache, f, indent=4) 
+        
 
     @staticmethod
-    def _get_prices(symbols: List[str], timestamp: int):
-        alpaca = tradeapi.REST()
-        bars = 10
-        end = arrow.get(timestamp).shift(minutes=5)
+    def ts_to_datetime(ts) -> str:
+        return datetime.fromtimestamp(ts / 1000.0).strftime('%Y-%m-%d %H:%M')
 
-        return alpaca.get_barset(symbols, "1Min", limit=bars, end=end.isoformat())
+    def _prefetch_tickers(self, symbol):
+        closes = []
+
+        print()
+        with RESTClient(self.key) as client:
+            cursor = arrow.get("2019-01-01")
+            to = arrow.get("2020-12-01")
+
+            while cursor < to:
+                start, end = cursor.format('YYYY-MM-DD'), to.format('YYYY-MM-DD')
+                resp = client.stocks_equities_aggregates(symbol, 1, "minute", start, end, unadjusted=False)
+
+                for result in resp.results:
+                    closes.append((result["t"], result['c']))
+
+                print(f"\rfetching {symbol}: {self.ts_to_datetime(result['t'])}", end="")
+                cursor = arrow.get(result["t"])
+
+        print()
+        return sorted(closes)
 
 
-def prefetch_quotes(symbols, timeframe="5Min", start="2019-01-01"):
-    """
-    Fetch quotes for all ticker so that the QuoteDB is fully loaded.
-    If quotes are missing then they will be fetched so running this isnt
-    necessary, however, it will speed up training significantly
-    """
-    storage = QuoteDB()
-    alpaca = tradeapi.REST()
-    stop = arrow.get(start)
-    end = arrow.get()
+if __name__ == '__main__':
+    import pandas as pd
+    from tqdm import tqdm
 
-    df = pd.DataFrame([])
-    while end > stop:
-        all_quotes = alpaca.get_barset(
-            symbols, timeframe, limit=1000, end=end.isoformat()
-        )
-        storage._insert_quotes(all_quotes)
+    quotes = Quotes()
 
-        for symbol in symbols:
-            quotes = [
-                {
-                    "High": q.h,
-                    "Low": q.l,
-                    "Close": q.c,
-                    "Open": q.o,
-                    "Time": q.t,
-                    "Symbol": symbol,
-                }
-                for q in all_quotes[symbol]
-            ]
-            df = pd.concat([df, pd.DataFrame(quotes)])
-
-            if len(quotes) > 0:
-                end = arrow.get(quotes[0]["Time"])
-
-        # abide by ratelimit
-        print(f"{end.format('YYYY-MM-DD')}\tlen: {len(df)}")
-        time.sleep(0.4)
-
-    df = df.sort_values(by="Time")
-    df = df.drop_duplicates()
+    # load all news
+    data_dir = "../pickle_news"
+    df = pd.concat(
+        [pd.read_pickle(f"{data_dir}/{filename}") for filename in os.listdir(data_dir)]
+    )
+    df = df.sort_values(by=["datetime"])
     df = df.reset_index(drop=True)
 
-    df.to_pickle("quotes.pkl")
+    symbols = set(df['symbol'])
+    for symbol in tqdm(symbols, total=len(symbols)):
+        times = df[df['symbol'] == symbol]['datetime'].values
 
+        closes = quotes._prefetch_tickers(symbol)
+        for time in tqdm(times, total=len(times)):
+            for close in closes:
+                if close[0] > time:
+                    quotes.cache[f"{symbol}{time}"] = close[1]
+                    break
 
-if __name__ == "__main__":
-    stocks_df = pd.read_csv("../nas100.csv")
-    universe = stocks_df["Symbol"].values
-    prefetch_quotes(universe)
+    quotes._save_cache()
