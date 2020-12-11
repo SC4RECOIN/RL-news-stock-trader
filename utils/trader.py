@@ -3,21 +3,20 @@ from utils.quotes import Quotes
 
 
 class Trader(object):
-    def __init__(self, hold_period=7, max_hold=10, starting_balance=30000):
+    def __init__(self, max_hold=10, starting_balance=30000):
         self.quotes = Quotes()
         self.starting_balance = starting_balance
         self.balance = starting_balance
         self.positions = {}
 
         # arbitrary parameters
-        self.hold_period = hold_period
         self.max_hold = max_hold
+        self.trade_fee = 5.00
 
     def trade_on_signal(self, symbol: str, signal: str, timestamp: int):
         """
         Trades on signal from RL model.
         Buy if bullish. Sell if in position on Bearish.
-        Hold position until `self.hold_period` if no bearish signals.
         Currently does not short on bearish signals.
         Can only hold `self.max_hold` positions.
         """
@@ -32,6 +31,9 @@ class Trader(object):
             self.rebalance(symbol, timestamp, True)
 
     def rebalance(self, symbol: str, timestamp: int, remove=False):
+        # trading fee (also deters frequent trades)
+        self.balance -= self.trade_fee
+
         positions = list(self.positions.keys())
         close = lambda s: self.quotes.get_quote(s, timestamp)
 
@@ -51,8 +53,8 @@ class Trader(object):
         # re-enter positions
         target_val = self.balance / len(positions)
         for symbol in positions:
-            qty = target_val // close(symbol) 
-            self.balance -= qty * close(symbol) 
+            qty = target_val // close(symbol)
+            self.balance -= qty * close(symbol)
             self.positions[symbol] = qty
 
     def reward(self, timestamp: int):
