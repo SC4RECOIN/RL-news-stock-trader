@@ -7,3 +7,4 @@ pickle_news
 *.db
 *.pkl
 cache
+price_cache

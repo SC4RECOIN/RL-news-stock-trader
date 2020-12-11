@@ -70,8 +70,7 @@ def main(
     time = 0
     num_policy_updates = 0
 
-    # for eps in tqdm(range(num_episodes), desc="episodes"):
-    for eps in range(num_episodes):
+    for eps in tqdm(range(num_episodes), desc="episodes"):
         trader = Trader()
 
         for idx in range(len(df) - 1):
@@ -92,13 +91,7 @@ def main(
             )
             reward = trader.reward(df["datetime"].iloc[idx])
 
-            #####
-            d = arrow.get(df["datetime"].iloc[idx]).format("YYYY-MM-DD")
-            print(f"\r{idx}\treward: {reward:8.2f}\t\t{d}", end="")
-            #####
-
             next_state = np.array(df["encoding"].iloc[idx + 1]).astype(np.float32)
-
             memory = Memory(state, action, action_log_prob, reward, False, value)
             memories.append(memory)
 
@@ -113,7 +106,7 @@ def main(
                     agent.learn_aux(aux_memories)
                     aux_memories.clear()
 
-        print(f"reward after episode: {reward}")
+        print(f"reward after episode: {reward:.2f}%")
 
         if eps % save_every == 0:
             agent.save()

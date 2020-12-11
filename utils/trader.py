@@ -1,10 +1,10 @@
 import os
-from utils.quotes import QuoteDB
+from utils.quotes import Quotes
 
 
 class Trader(object):
     def __init__(self, hold_period=7, max_hold=10, starting_balance=30000):
-        self.quotes = QuoteDB()
+        self.quotes = Quotes()
         self.starting_balance = starting_balance
         self.balance = starting_balance
         self.positions = {}
@@ -33,20 +33,16 @@ class Trader(object):
 
     def rebalance(self, symbol: str, timestamp: int, remove=False):
         positions = list(self.positions.keys())
-        quotes = self.quotes.get_quotes(positions, timestamp)
+        close = lambda s: self.quotes.get_quote(s, timestamp)
 
         # sell all positions
         for symbol, qty in self.positions.items():
-            self.balance += quotes[symbol] * qty
+            self.balance += close(symbol) * qty
 
         if remove:
             positions = [p for p in positions if p != symbol]
         else:
             positions.append(symbol)
-
-            # get quote for new pos
-            quote = self.quotes.get_quotes([symbol], timestamp)
-            quotes[symbol] = quote[symbol]
 
         self.positions = {}
         if len(positions) == 0:
@@ -55,8 +51,8 @@ class Trader(object):
         # re-enter positions
         target_val = self.balance / len(positions)
         for symbol in positions:
-            qty = target_val // quotes[symbol]
-            self.balance -= qty * quotes[symbol]
+            qty = target_val // close(symbol) 
+            self.balance -= qty * close(symbol) 
             self.positions[symbol] = qty
 
     def reward(self, timestamp: int):
@@ -65,9 +61,9 @@ class Trader(object):
         Calculates current value of positions over intial capital.
         """
         positions = self.positions.keys()
-        quotes = self.quotes.get_quotes(positions, timestamp)
+        close = lambda s: self.quotes.get_quote(s, timestamp)
         value = (
-            sum([quotes[symbol] * qty for symbol, qty in self.positions.items()])
+            sum([close(symbol) * qty for symbol, qty in self.positions.items()])
             + self.balance
         )
 
