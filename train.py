@@ -120,4 +120,5 @@ if __name__ == "__main__":
     df = df.sort_values(by=["datetime"])
     df = df.reset_index(drop=True)
 
-    main(df)
+    print(len(df["encoding"].iloc[0]))
+    # main(df)

@@ -1,12 +1,13 @@
-from sentence_transformers import SentenceTransformer
 from typing import List
 import string
 import pandas as pd
 import numpy as np
 import json
 import os
+import tensorflow_hub as hub
 
-model = SentenceTransformer("distilbert-base-nli-stsb-mean-tokens")
+
+embed = hub.load("https://tfhub.dev/google/universal-sentence-encoder/4")
 
 
 def preprocessing(sentences: List[str]) -> List[str]:
@@ -16,7 +17,7 @@ def preprocessing(sentences: List[str]) -> List[str]:
 
 def encode(sentences: List[str]) -> np.ndarray:
     sentences = preprocessing(sentences)
-    return model.encode(sentences)
+    return embed(sentences)
 
 
 if __name__ == "__main__":
