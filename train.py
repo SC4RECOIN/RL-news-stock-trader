@@ -7,6 +7,7 @@ from torch.distributions import Categorical
 from collections import deque, namedtuple
 from tqdm import tqdm
 from utils.trader import Trader
+import datetime
 import arrow
 
 signals = ["BULLISH", "NEUTRAL", "BEARISH"]
@@ -117,8 +118,11 @@ if __name__ == "__main__":
     df = pd.concat(
         [pd.read_pickle(f"{data_dir}/{filename}") for filename in os.listdir(data_dir)]
     )
-    df = df.sort_values(by=["datetime"])
+
+    # filter out older news and sort by date
+    df["timestamp"] = pd.to_datetime(df["timestamp"])
+    df = df[df["timestamp"] > pd.to_datetime("2019-01-01T00:00:00Z")]
+    df = df.sort_values(by=["timestamp"])
     df = df.reset_index(drop=True)
 
-    print(len(df["encoding"].iloc[0]))
     # main(df)
