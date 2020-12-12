@@ -9,58 +9,54 @@ from typing import List
 from tqdm import tqdm
 import time
 
-if "IEX_TOKEN" not in os.environ:
-    raise Exception("Please add `IEX_TOKEN` to your env vars")
+if "POLYGON_KEY" not in os.environ:
+    raise Exception("Please add `POLYGON_KEY` to your env vars")
 
 
 @dataclass
 class NewsItem:
-    datetime: int
-    date: str
-    headline: str
+    timestamp: str
+    title: str
     source: str
     url: str
     summary: str
-    related: List[str]
+    keywords: List[str]
     symbol: str
 
 
 def get_hist_news(symbol: str) -> List[NewsItem]:
-    url = f"https://cloud.iexapis.com/v1/time-series/news/{symbol}"
-    url = f"{url}?token={os.environ['IEX_TOKEN']}&limit=50"
+    url = f"https://api.polygon.io/v1/meta/symbols/{symbol}/news"
+    url = f"{url}?apiKey={os.environ['POLYGON_KEY']}&perpage=50"
+    date, page = arrow.now(), 1
     news_items = []
 
-    date = arrow.get("2019-01-01")
-
-    while date < arrow.now():
-        date_str = date.format("YYYY-MM-DD")
-        date = date.shift(days=1)
-
+    # collect all news after 2018
+    while date > arrow.get("2019-01-01"):
         try:
-            # fetch news for specific date
-            r = requests.get(f"{url}&on={date_str}")
-            print(f"fetching {symbol} on {date_str}")
-
+            r = requests.get(f"{url}&page={page}")
             news_items.extend(
                 [
                     NewsItem(
-                        datetime=item["datetime"],
-                        date=date_str,
-                        headline=item["headline"],
+                        timestamp=item["timestamp"],
+                        title=item["title"],
                         source=item["source"],
                         url=item["url"],
                         summary=item["summary"],
-                        related=item["related"].split(","),
+                        keywords=item["keywords"],
                         symbol=symbol,
                     )
                     for item in r.json()
                 ]
             )
 
-            time.sleep(0.02)
+            date = arrow.get(news_items[-1].timestamp)
+            page += 1
+
+            if len(r.json()) == 0:
+                break
 
         except Exception as e:
-            print(f"error getting news for {symbol} on {date_str}\n{e}\n{r.json()}")
+            print(f"error getting news for {symbol}")
 
     return news_items
 
